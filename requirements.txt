@@ -1,0 +1,5 @@
+openai-agents
+tavily-python
+python-dotenv
+requests
+graphviz
