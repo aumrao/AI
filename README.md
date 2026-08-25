@@ -1,17 +1,14 @@
-# AI Technical Interview Portal (LangGraph & Whisper)
+# AI Technical Interview Portal (Google Gemini & LangGraph)
 
-An enterprise-grade, multi-agent AI technical interview platform built with **LangGraph**, **Streamlit**, **OpenAI GPT-4o**, **Google Gemini**, and local **Whisper.cpp** speech-to-text transcription.
+An enterprise-grade, AI technical interview platform built with **LangGraph**, **Streamlit**, **Google Gemini**, and local **Whisper.cpp** speech-to-text transcription.
 
 ---
 
 ## 🌟 Key Capabilities
 
-### 1. LangGraph Multi-Agent Architecture
-- **Single Agent Mode**: Direct execution with **OpenAI GPT-4o** or **Google Gemini**.
-- **Dual Agent + Evaluator Synthesis Mode (`Both`)**:
-  - Concurrently dispatches generation to both Gemini and OpenAI LLMs.
-  - An independent **Evaluator Bar Raiser Agent** assesses both outputs for depth, relevance, and coverage.
-  - Merges and synthesizes the optimal **360-Degree 1-Hour Technical Interview Guide**.
+### 1. LangGraph Orchestration & Google Gemini Integration
+- **Direct Google Gemini Workflow**: High-throughput structured technical interview generation using Gemini models (`gemini-2.5-flash`, `gemini-2.5-pro`).
+- **Autonomous Formatting & Parsing**: LangGraph StateGraph pipeline formats, structures, and segments the generated technical Q&A into dedicated summary and live interview workspaces.
 
 ### 2. 360-Degree Technical Interview Assessment (20 Q&A Pairs)
 Covers all dimensions for senior/staff engineering screening:
@@ -25,7 +22,7 @@ Covers all dimensions for senior/staff engineering screening:
 ### 3. Whisper.cpp Speech-to-Text & Live Candidate Evaluation
 - **Microphone Recording & Audio Upload**: Live audio capture with local C++ accelerated `pywhispercpp`.
 - **Automatic Performance Evaluation**:
-  - Spoken interview transcript is immediately analyzed by the AI Evaluation Engine.
+  - Spoken interview transcript is immediately analyzed by the Gemini AI Evaluation Engine.
   - **Eligibility Badge**: `ELIGIBLE FOR SELECTION` / `STRONGLY RECOMMENDED` / `BORDERLINE` / `NOT ELIGIBLE`.
   - **Selection Probability**: Calculated percentage score (e.g. `90%`).
   - **Question-by-Question Assessment**: Evaluates technical accuracy, depth, and clarity.
@@ -39,7 +36,7 @@ Covers all dimensions for senior/staff engineering screening:
 ```text
 interview_portal/
 ├── app.py                      # Main application entry point with load_dotenv()
-├── requirements.txt            # Python dependencies (Streamlit, LangGraph, LangChain, pywhispercpp)
+├── requirements.txt            # Python dependencies (Streamlit, LangGraph, LangChain Google GenAI, pywhispercpp)
 ├── Makefile                    # Make targets for linting, formatting, and running
 ├── .env.example                # Environment variables template
 ├── .gitignore                  # Git ignore rules (protects API keys and virtual environments)
@@ -54,7 +51,7 @@ interview_portal/
         ├── ui.py               # Main UI rendering and event handlers
         └── services/
             ├── __init__.py     # Service exports
-            ├── graph.py        # LangGraph StateGraph workflow & evaluation engine
+            ├── graph.py        # LangGraph StateGraph workflow & Gemini evaluation engine
             └── transcription.py # Whisper.cpp local audio speech-to-text service
 ```
 
@@ -73,9 +70,8 @@ Create a `.env` file in the root directory:
 ```bash
 cp .env.example .env
 ```
-Add your API credentials:
+Add your Gemini API credentials:
 ```ini
-OPENAI_API_KEY=your_openai_api_key_here
 GOOGLE_API_KEY=your_gemini_api_key_here
 ```
 
