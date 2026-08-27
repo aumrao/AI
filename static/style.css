@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg-main: #0B0F19;
+    --bg-card: rgba(18, 24, 38, 0.75);
+    --bg-card-hover: rgba(28, 36, 56, 0.85);
+    --primary: #6366F1;
+    --primary-glow: rgba(99, 102, 241, 0.35);
+    --secondary: #06B6D4;
+    --accent: #A855F7;
+    --text-main: #F1F5F9;
+    --text-muted: #94A3B8;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-glow: rgba(99, 102, 241, 0.4);
+    --success: #10B981;
+}
+
+/* Base App Styling */
+.stApp {
+    background-color: var(--bg-main) !important;
+    font-family: 'Outfit', -apple-system, sans-serif !important;
+    color: var(--text-main) !important;
+}
+
+/* Header & Titles */
+.main-header {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem 1rem;
+    background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18), transparent 70%);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+
+.main-title {
+    font-size: 2.75rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #FFFFFF 20%, #A5B4FC 60%, #06B6D4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+.main-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    max-width: 650px;
+    margin: 0 auto;
+    font-weight: 400;
+}
+
+/* Card Containers */
+.glass-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: 0 12px 35px var(--primary-glow);
+}
+
+/* Glowing API Key Input Box Banner */
+.api-banner {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.12));
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Highlight badge */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.825rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(99, 102, 241, 0.2);
+    color: #C7D2FE;
+    border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.badge-time {
+    background: rgba(6, 182, 212, 0.15);
+    color: #67E8F9;
+    border: 1px solid rgba(6, 182, 212, 0.35);
+}
+
+.badge-score {
+    background: rgba(16, 185, 129, 0.15);
+    color: #6EE7B7;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+/* Timeline Chapter Card */
+.timeline-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.timeline-card:hover {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: var(--primary);
+    transform: translateX(4px);
+}
+
+/* Custom Buttons */
+.stButton>button {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    padding: 0.65rem 1.5rem !important;
+    box-shadow: 0 4px 15px rgba(79, 70, 229, 0.35) !important;
+    transition: all 0.25s ease !important;
+}
+
+.stButton>button:hover {
+    box-shadow: 0 6px 22px rgba(124, 58, 237, 0.5) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Download Button Special Gradient */
+.stDownloadButton>button {
+    background: linear-gradient(135deg, #059669 0%, #10B981 100%) !important;
+    color: #FFFFFF !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 1.05rem !important;
+    padding: 0.75rem 2rem !important;
+    box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4) !important;
+}
+
+.stDownloadButton>button:hover {
+    box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Metric / Stat box */
+.stat-box {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #38BDF8;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.2rem;
+}
