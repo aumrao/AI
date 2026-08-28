@@ -9,8 +9,9 @@ from typing import Optional, Tuple
 def get_ffmpeg_exe() -> str:
     """
     Locates or prepares the FFmpeg executable.
-    Ensures ffmpeg.exe is in a local bin/ directory and added to os.environ["PATH"],
-    making it automatically discoverable by yt-dlp, subprocesses, and libraries.
+    1. Checks system PATH first (e.g., Linux /usr/bin/ffmpeg from packages.txt or Windows PATH).
+    2. Falls back to imageio_ffmpeg bundled binary, creates a standard bin/ffmpeg (or bin/ffmpeg.exe),
+       sets executable permissions on POSIX (Linux/macOS), and prepends to os.environ["PATH"].
     """
     system_ffmpeg = shutil.which("ffmpeg")
     if system_ffmpeg:
@@ -20,11 +21,13 @@ def get_ffmpeg_exe() -> str:
         import imageio_ffmpeg
         raw_exe = imageio_ffmpeg.get_ffmpeg_exe()
         if raw_exe and os.path.exists(raw_exe):
-            # Create a bin folder with standardized ffmpeg.exe
+            is_windows = os.name == 'nt'
             project_root = Path(__file__).resolve().parent.parent
             bin_dir = project_root / "bin"
             bin_dir.mkdir(exist_ok=True)
-            std_ffmpeg = bin_dir / "ffmpeg.exe"
+            
+            target_name = "ffmpeg.exe" if is_windows else "ffmpeg"
+            std_ffmpeg = bin_dir / target_name
             
             if not std_ffmpeg.exists():
                 try:
@@ -32,10 +35,29 @@ def get_ffmpeg_exe() -> str:
                 except Exception:
                     pass
 
-            # Prepend bin_dir to os.environ["PATH"]
+            # Ensure executable permissions on Linux/macOS
+            if not is_windows:
+                try:
+                    if std_ffmpeg.exists():
+                        std_ffmpeg.chmod(0o755)
+                    Path(raw_exe).chmod(0o755)
+                except Exception:
+                    pass
+
+            # Prepend bin_dir and raw binary directory to os.environ["PATH"]
             bin_str = str(bin_dir.resolve())
-            if bin_str not in os.environ.get("PATH", ""):
-                os.environ["PATH"] = f"{bin_str}{os.pathsep}{os.environ.get('PATH', '')}"
+            raw_dir = str(Path(raw_exe).parent.resolve())
+            current_path = os.environ.get("PATH", "")
+            
+            for d in [bin_str, raw_dir]:
+                if d not in current_path:
+                    current_path = f"{d}{os.pathsep}{current_path}"
+            os.environ["PATH"] = current_path
+
+            # Re-check shutil.which after updating PATH
+            which_now = shutil.which("ffmpeg")
+            if which_now:
+                return which_now
 
             if std_ffmpeg.exists():
                 return str(std_ffmpeg)
