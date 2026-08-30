@@ -250,6 +250,15 @@ def extract_video_clips_node(state: VideoSummarizerState) -> Dict[str, Any]:
     output_dir = os.path.join(state.get("output_base_dir", "./temp_workspace"), "clips")
     timings = dict(state.get("timing_metrics", {}))
 
+    if not source_video or not os.path.exists(source_video):
+        timings["clip_extract_time"] = 0.0
+        return {
+            "extracted_clips": [],
+            "current_step": "Highlights processed",
+            "progress_pct": 80,
+            "timing_metrics": timings,
+        }
+
     clips = extract_clips(source_video=source_video, highlights=highlights, output_dir=output_dir)
     timings["clip_extract_time"] = round(time.perf_counter() - t0, 2)
 
@@ -268,6 +277,15 @@ def generate_snapshots_node(state: VideoSummarizerState) -> Dict[str, Any]:
     highlights = state.get("highlights", [])
     output_dir = os.path.join(state.get("output_base_dir", "./temp_workspace"), "snapshots")
     timings = dict(state.get("timing_metrics", {}))
+
+    if not source_video or not os.path.exists(source_video):
+        timings["snapshot_time"] = 0.0
+        return {
+            "snapshots": [],
+            "current_step": "Snapshots processed",
+            "progress_pct": 90,
+            "timing_metrics": timings,
+        }
 
     snapshots = generate_snapshots(source_video=source_video, highlights=highlights, output_dir=output_dir)
     timings["snapshot_time"] = round(time.perf_counter() - t0, 2)
@@ -288,8 +306,11 @@ def concatenate_summary_video_node(state: VideoSummarizerState) -> Dict[str, Any
     output_path = os.path.join(output_dir, "summary.mp4")
     timings = dict(state.get("timing_metrics", {}))
 
-    final_video = concatenate_clips(clip_paths=clips, output_path=output_path)
-    timings["concat_time"] = round(time.perf_counter() - t0, 2)
+    final_video = ""
+    if clips:
+        final_video = concatenate_clips(clip_paths=clips, output_path=output_path)
+    
+    timings["concat_time"] = round(time.perf_counter() - t0, 2) if clips else 0.0
     timings["total_pipeline_time"] = round(
         timings.get("download_time", 0) +
         timings.get("transcribe_time", 0) +
@@ -306,6 +327,7 @@ def concatenate_summary_video_node(state: VideoSummarizerState) -> Dict[str, Any
         "progress_pct": 100,
         "timing_metrics": timings,
     }
+
 
 
 def create_video_summarizer_graph():

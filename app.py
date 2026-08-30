@@ -572,7 +572,8 @@ def render_results_dashboard(res: dict):
                     use_container_width=True
                 )
         else:
-            st.warning("Summarized video file not found.")
+            st.info("💡 **Executive Summary Mode**: Complete structured chapter insights, takeaways, and timeline quotes are generated below.")
+
 
     st.markdown('</div>', unsafe_allow_html=True)
 

@@ -128,7 +128,7 @@ def download_youtube_video(
         fallback_opts['format'] = 'best[ext=mp4]/best'
         fallback_opts['extractor_args'] = {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb'],
+                'player_client': ['android', 'ios', 'mweb'],
                 'player_skip': ['webpage', 'configs'],
             }
         }
@@ -136,40 +136,46 @@ def download_youtube_video(
             with yt_dlp.YoutubeDL(fallback_opts) as ydl:
                 info = ydl.extract_info(url, download=True)
         except Exception as fb_err:
-            # Fallback 2: Stream URL direct extraction
-            fallback_opts_2 = dict(ydl_opts)
-            fallback_opts_2['format'] = 'bestvideo*+bestaudio/best'
-            fallback_opts_2['extractor_args'] = {
-                'youtube': {
-                    'player_client': ['mweb', 'android'],
+            print(f"Secondary yt-dlp download failed ({fb_err}), switching to direct metadata/subtitles engine...")
+            try:
+                meta = get_youtube_info(url)
+                subs = extract_youtube_subtitles(url)
+                return {
+                    "title": meta.get("title", "YouTube Video"),
+                    "duration": float(meta.get("duration", 0)),
+                    "thumbnail": meta.get("thumbnail", ""),
+                    "author": meta.get("author", "Unknown"),
+                    "video_path": "",
+                    "video_id": meta.get("id", ""),
+                    "source_type": "youtube",
+                    "subtitles": subs,
                 }
-            }
-            with yt_dlp.YoutubeDL(fallback_opts_2) as ydl:
-                info = ydl.extract_info(url, download=True)
+            except Exception as meta_err:
+                raise RuntimeError(f"Unable to process YouTube video data: {meta_err}")
 
-        video_id = info.get("id")
-        # Locate the downloaded file
-        expected_path = os.path.join(output_dir, f"{video_id}.mp4")
-        if not os.path.exists(expected_path):
-            # Check if another extension was produced
-            for file in os.listdir(output_dir):
-                if file.startswith(video_id):
-                    expected_path = os.path.join(output_dir, file)
-                    break
+    video_id = info.get("id")
+    # Locate the downloaded file
+    expected_path = os.path.join(output_dir, f"{video_id}.mp4")
+    if not os.path.exists(expected_path):
+        for file in os.listdir(output_dir):
+            if file.startswith(video_id):
+                expected_path = os.path.join(output_dir, file)
+                break
 
-        duration = info.get("duration") or get_video_duration(expected_path)
-        subtitles = parse_subtitles_from_info_dict(info)
+    duration = info.get("duration") or get_video_duration(expected_path)
+    subtitles = parse_subtitles_from_info_dict(info)
 
-        return {
-            "title": info.get("title", "YouTube Video"),
-            "duration": float(duration),
-            "thumbnail": info.get("thumbnail", ""),
-            "author": info.get("uploader", "Unknown"),
-            "video_path": os.path.abspath(expected_path),
-            "video_id": video_id,
-            "source_type": "youtube",
-            "subtitles": subtitles,
-        }
+    return {
+        "title": info.get("title", "YouTube Video"),
+        "duration": float(duration),
+        "thumbnail": info.get("thumbnail", ""),
+        "author": info.get("uploader", "Unknown"),
+        "video_path": os.path.abspath(expected_path) if os.path.exists(expected_path) else "",
+        "video_id": video_id,
+        "source_type": "youtube",
+        "subtitles": subtitles,
+    }
+
 
 
 
