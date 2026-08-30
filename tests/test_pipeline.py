@@ -137,6 +137,31 @@ class TestVideoSummarizerPipeline(unittest.TestCase):
         self.assertLess(summary_duration, 9.0)
         print(f"Summary video created successfully! Duration: {summary_duration:.2f}s")
 
+    def test_whisper_device_detection(self):
+        """Verify detect_whisper_device runs safely without throwing unhandled exceptions."""
+        from core.transcriber import detect_whisper_device
+        dev, comp = detect_whisper_device()
+        self.assertIn(dev, ["cpu", "cuda"])
+        self.assertIn(comp, ["int8", "float16", "default"])
+
+    def test_gemini_key_pool(self):
+        """Verify GeminiKeyPool parses keys and rotates correctly."""
+        from core.key_pool import GeminiKeyPool
+        keys_str = "AIzaSyKey1_123456789, AIzaSyKey2_987654321 \n AIzaSyKey3_1122334455"
+        parsed = GeminiKeyPool.parse_keys_str(keys_str)
+        self.assertEqual(len(parsed), 3)
+
+        pool = GeminiKeyPool(parsed)
+        self.assertEqual(pool.size(), 3)
+        k1 = pool.get_next_key()
+        k2 = pool.get_next_key()
+        self.assertNotEqual(k1, k2)
+
+        sharded = pool.get_sharded_keys(4)
+        self.assertEqual(len(sharded), 4)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

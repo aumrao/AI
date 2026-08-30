@@ -21,6 +21,9 @@ from core.downloader import (
     save_uploaded_video
 )
 from core.graph import create_video_summarizer_graph
+from core.transcriber import detect_whisper_device
+from core.llm_summarizer import get_installed_ollama_models
+from core.key_pool import GeminiKeyPool
 
 # Page configuration
 st.set_page_config(
@@ -57,31 +60,41 @@ def render_header():
     """, unsafe_allow_html=True)
 
 
-from core.llm_summarizer import get_installed_ollama_models
-
-
 def render_sidebar():
-    st.sidebar.markdown("### ⚙️ AI & Engine Configuration")
+    st.sidebar.markdown("### ⚡ Performance & Engine")
 
-    # LLM Provider Selection
+    # Speed Profile
+    speed_profile = st.sidebar.radio(
+        "Performance Profile",
+        options=["⚡ Turbo Mode (Fastest)", "🎯 High Quality Mode"],
+        index=0,
+        help="Turbo Mode uses 720p fast streams, multi-threaded FFmpeg, and greedy Whisper decoding to summarize in seconds."
+    )
+    is_turbo = "Turbo" in speed_profile
+    video_res = "720p" if is_turbo else "1080p"
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🤖 LLM Provider Configuration")
+
+    # LLM Provider Selection (Google Gemini 3.7 Flash default)
     provider = st.sidebar.selectbox(
         "LLM Provider",
         options=[
-            "Ollama (100% Free Local - No Key)",
-            "Groq (Free Fast Cloud Tier)",
-            "OpenRouter (Free Cloud Models)",
             "Google Gemini (Free AI Studio Key)",
+            "Groq (Free Fast Cloud Tier)",
+            "Ollama (100% Free Local - No Key)",
+            "OpenRouter (Free Cloud Models)",
             "OpenAI",
         ],
         index=0,
-        help="Choose from 100% free local models (Ollama), free cloud APIs (Groq, OpenRouter), or Gemini/OpenAI."
+        help="Google AI Studio provides free Gemini 3.7 Flash API keys for ultra-fast summarization."
     )
 
     provider_key_map = {
-        "Ollama (100% Free Local - No Key)": ("ollama", "", "http://localhost:11434"),
-        "Groq (Free Fast Cloud Tier)": ("groq", "GROQ_API_KEY", "https://console.groq.com/keys"),
-        "OpenRouter (Free Cloud Models)": ("openrouter", "OPENROUTER_API_KEY", "https://openrouter.ai/keys"),
         "Google Gemini (Free AI Studio Key)": ("google", "GEMINI_API_KEY", "https://aistudio.google.com/app/apikey"),
+        "Groq (Free Fast Cloud Tier)": ("groq", "GROQ_API_KEY", "https://console.groq.com/keys"),
+        "Ollama (100% Free Local - No Key)": ("ollama", "", "http://localhost:11434"),
+        "OpenRouter (Free Cloud Models)": ("openrouter", "OPENROUTER_API_KEY", "https://openrouter.ai/keys"),
         "OpenAI": ("openai", "OPENAI_API_KEY", "https://platform.openai.com/api-keys"),
     }
 
@@ -148,25 +161,30 @@ def render_sidebar():
         )
 
     elif prov_id == "google":
-        st.sidebar.markdown("**🔑 Gemini API Key**")
-        user_api_key = st.sidebar.text_input(
-            "Enter Gemini API Key",
-            value=env_key,
-            type="password",
-            placeholder="AIzaSy...",
-            help=f"Get a free key at: {key_url}"
+        st.sidebar.markdown("**🔑 Gemini API Key(s)**")
+        user_api_key = st.sidebar.text_area(
+            "Enter Gemini API Key(s)",
+            value=os.getenv("GEMINI_API_KEYS") or env_key,
+            placeholder="AIzaSy... (Paste 1 or multiple keys separated by comma or new lines)",
+            help=f"Paste 1 or multiple Gemini API keys from different accounts for parallel processing. Get free keys at: {key_url}"
         )
-        if user_api_key:
-            st.sidebar.caption("✅ Gemini Key configured")
+        parsed_keys = GeminiKeyPool.parse_keys_str(user_api_key)
+        if len(parsed_keys) > 1:
+            st.sidebar.success(f"🚀 **{len(parsed_keys)} Gemini Keys Active** (Parallel Multi-Account Acceleration)")
+        elif len(parsed_keys) == 1:
+            st.sidebar.caption("✅ 1 Gemini Key configured")
         else:
             st.sidebar.info("💡 Google AI Studio provides free API keys.")
             st.sidebar.markdown(f"[👉 Get a free Gemini Key]({key_url})")
 
+
         model_name = st.sidebar.selectbox(
             "Gemini Model",
-            options=["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"],
+            options=["gemini-3.7-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.1-pro-preview"],
             index=0
         )
+
+
 
     else:  # OpenAI
         st.sidebar.markdown("**🔑 OpenAI API Key**")
@@ -189,13 +207,32 @@ def render_sidebar():
         )
 
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🎙️ Speech & Video Settings")
+    st.sidebar.markdown("### 🎙️ Speech & Transcription")
+
+    trans_mode = st.sidebar.selectbox(
+        "Transcription Engine",
+        options=[
+            "⚡ Auto (Fastest: Online Captions → Cloud → Whisper)",
+            "🚀 Groq Whisper Cloud (~1-2s Ultra Fast)",
+            "💻 Local Faster-Whisper (On-Device)",
+            "🌐 YouTube Captions Only",
+        ],
+        index=0,
+        help="Choose automatic multi-tier speed fallback or lock to specific speech transcriber."
+    )
+
+    trans_mode_map = {
+        "⚡ Auto (Fastest: Online Captions → Cloud → Whisper)": "auto",
+        "🚀 Groq Whisper Cloud (~1-2s Ultra Fast)": "groq",
+        "💻 Local Faster-Whisper (On-Device)": "local",
+        "🌐 YouTube Captions Only": "captions",
+    }
 
     whisper_model = st.sidebar.selectbox(
-        "Whisper Speech Model",
+        "Local Whisper Model Size",
         options=["base", "tiny", "small", "medium"],
-        index=0,
-        help="'base' or 'tiny' are fastest for CPU, 'small' gives higher accuracy."
+        index=0 if is_turbo else 1,
+        help="'base' or 'tiny' with beam_size=1 are fastest on CPU."
     )
 
     summary_ratio = st.sidebar.slider(
@@ -229,8 +266,12 @@ def render_sidebar():
         custom_focus = f"Prioritize clips focusing on: {focus_mode}"
 
     st.sidebar.markdown("---")
+    hw_dev, hw_comp = detect_whisper_device()
+    hw_label = f"CUDA GPU ({hw_comp})" if hw_dev == "cuda" else f"CPU Multi-Thread ({min(4, os.cpu_count() or 4)} Cores)"
     ffmpeg_status = "✅ Ready" if get_ffmpeg_exe() else "❌ Not found"
-    st.sidebar.caption(f"FFmpeg Engine: {ffmpeg_status}")
+    
+    st.sidebar.caption(f"⚙️ Acceleration: `{hw_label}`")
+    st.sidebar.caption(f"🎬 FFmpeg Engine: `{ffmpeg_status}`")
 
     return {
         "provider": prov_id,
@@ -239,6 +280,9 @@ def render_sidebar():
         "whisper_model": whisper_model,
         "summary_ratio": summary_ratio / 100.0,
         "custom_focus": custom_focus,
+        "video_resolution": video_res,
+        "transcription_provider": trans_mode_map.get(trans_mode, "auto"),
+        "is_turbo": is_turbo,
     }
 
 
@@ -321,20 +365,23 @@ def main():
         st.markdown("""
         <div class="api-banner">
             <span style="font-size: 1.2rem;">🔑</span> 
-            <strong>API Key Required:</strong> Please enter your API key in the left sidebar under <em>"LLM & Engine Configuration"</em> to enable AI video summarization, or select <strong>Ollama (100% Free Local)</strong>.
+            <strong>API Key Required:</strong> Please enter your API key in the left sidebar under <em>"LLM Provider Configuration"</em> to enable AI video summarization, or select <strong>Ollama (100% Free Local)</strong>.
         </div>
         """, unsafe_allow_html=True)
 
     # Action Button
     can_process = bool(source_type and source_target and (config["api_key"] or config["provider"] == "ollama"))
 
-    col_btn, _ = st.columns([2, 3])
+    col_btn, col_mode = st.columns([2, 3])
     with col_btn:
         start_button = st.button(
-            "✨ Generate Video Summary",
+            "✨ Generate Fast Video Summary",
             disabled=not can_process,
             use_container_width=True,
         )
+    with col_mode:
+        profile_badge = "⚡ Turbo Accelerated Mode" if config["is_turbo"] else "🎯 High Quality Profile"
+        st.caption(f"Current Pipeline: **{profile_badge}** (`{config['video_resolution']}`, Whisper `{config['whisper_model']}`)")
 
     if start_button:
         st.session_state.processing = True
@@ -349,7 +396,7 @@ def main():
         progress_bar = st.progress(5)
         status_text = st.empty()
 
-        status_text.markdown("⏳ **Initializing LangGraph Video Summarizer Pipeline...**")
+        status_text.markdown("⏳ **Initializing Accelerated LangGraph Video Pipeline...**")
 
         try:
             # Build initial state
@@ -359,38 +406,44 @@ def main():
                 "output_base_dir": current_run_dir,
                 "target_summary_ratio": config["summary_ratio"],
                 "custom_focus_prompt": config["custom_focus"],
+                "video_resolution": config["video_resolution"],
                 "llm_provider": config["provider"],
                 "llm_api_key": config["api_key"],
                 "llm_model_name": config["model_name"],
                 "whisper_model_size": config["whisper_model"],
+                "transcription_provider": config["transcription_provider"],
+                "cloud_whisper_api_key": os.getenv("GROQ_API_KEY", "") or (config["api_key"] if config["provider"] == "groq" else ""),
             }
 
             # Compile and stream graph
             graph = create_video_summarizer_graph()
 
-            step_messages = {
-                "prepare_media": ("📥 Ingesting & downloading media...", 20),
-                "transcribe": ("🎙️ Transcribing audio with timestamps (Whisper)...", 45),
-                "select_highlights": ("🧠 AI analyzing transcript & selecting key highlights...", 70),
-                "extract_clips": ("✂️ FFmpeg cutting highlight clips...", 85),
-                "generate_snapshots": ("📸 Capturing chapter snapshots...", 92),
-                "concatenate_summary": ("🎬 Stitching final summary.mp4...", 98),
+            step_descriptions = {
+                "prepare_media": ("🎙️ Transcribing audio & speech...", 35),
+                "transcribe": ("🧠 AI selecting key highlight moments...", 60),
+                "select_highlights": ("✂️ Multi-threaded FFmpeg cutting highlight clips...", 80),
+                "extract_clips": ("📸 Parallel chapter snapshot generation...", 90),
+                "generate_snapshots": ("🎬 Fast stitching final summary.mp4...", 96),
+                "concatenate_summary": ("🎉 Finalizing video summary dashboard...", 100),
             }
+
+            status_text.markdown("📥 **Ingesting & downloading media (Fast 720p stream)...**")
+            progress_bar.progress(15)
 
             final_state = initial_state
             for output in graph.stream(initial_state):
                 for node_name, state_update in output.items():
                     final_state.update(state_update)
-                    if node_name in step_messages:
-                        msg, pct = step_messages[node_name]
-                        status_text.markdown(f"**{msg}**")
-                        progress_bar.progress(pct)
+                    if node_name in step_descriptions:
+                        next_msg, next_pct = step_descriptions[node_name]
+                        status_text.markdown(f"**{next_msg}**")
+                        progress_bar.progress(next_pct)
 
-            progress_bar.progress(100)
             status_text.markdown("🎉 **Video summarization complete!**")
             st.session_state.result_state = final_state
             st.session_state.processing = False
             st.rerun()
+
 
         except Exception as e:
             st.session_state.processing = False
@@ -407,7 +460,7 @@ def main():
 
 def render_results_dashboard(res: dict):
     st.markdown("---")
-    st.markdown("## 📊 Summarization Results")
+    st.markdown("## 📊 Summarization Results & Performance")
 
     orig_dur = res.get("video_duration", 0.0)
     final_video = res.get("final_video_path")
@@ -416,6 +469,8 @@ def render_results_dashboard(res: dict):
     pct_saved = ((orig_dur - final_dur) / orig_dur * 100) if orig_dur > 0 else 0
     highlights = res.get("highlights", [])
     snapshots = res.get("snapshots", [])
+    timings = res.get("timing_metrics", {})
+    trans_source = res.get("transcription_source", "speech_engine")
 
     # Stats Banner
     c1, c2, c3, c4 = st.columns(4)
@@ -437,7 +492,7 @@ def render_results_dashboard(res: dict):
         st.markdown(f"""
         <div class="stat-box">
             <div class="stat-value" style="color: #10B981;">{pct_saved:.0f}%</div>
-            <div class="stat-label">Time Saved</div>
+            <div class="stat-label">Video Time Saved</div>
         </div>
         """, unsafe_allow_html=True)
     with c4:
@@ -445,6 +500,45 @@ def render_results_dashboard(res: dict):
         <div class="stat-box">
             <div class="stat-value">{len(highlights)}</div>
             <div class="stat-label">Key Highlights Extracted</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Performance Telemetry Card
+    if timings:
+        total_p_time = timings.get("total_pipeline_time", 0)
+        st.markdown(f"""
+        <div class="telemetry-container">
+            <div class="telemetry-title">
+                ⚡ Pipeline Execution Telemetry & Breakdown &nbsp;
+                <span class="badge badge-turbo">⚡ Total Processing: {total_p_time}s</span>
+                <span class="badge badge-gpu">🎙️ {trans_source.replace('_', ' ').title()}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;">
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('download_time', 0)}s</div>
+                    <div class="telemetry-lbl">📥 Media Ingest</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('transcribe_time', 0)}s</div>
+                    <div class="telemetry-lbl">🎙️ Transcription</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('llm_time', 0)}s</div>
+                    <div class="telemetry-lbl">🧠 AI Synthesis</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('clip_extract_time', 0)}s</div>
+                    <div class="telemetry-lbl">✂️ Parallel Cutting</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('snapshot_time', 0)}s</div>
+                    <div class="telemetry-lbl">📸 Snapshots</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-val">{timings.get('concat_time', 0)}s</div>
+                    <div class="telemetry-lbl">🎬 Video Stitch</div>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -543,3 +637,4 @@ def render_results_dashboard(res: dict):
 
 if __name__ == "__main__":
     main()
+

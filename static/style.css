@@ -176,3 +176,59 @@
     letter-spacing: 0.05em;
     margin-top: 0.2rem;
 }
+
+/* Performance Telemetry Grid */
+.telemetry-container {
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.telemetry-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #A5B4FC;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.telemetry-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    text-align: center;
+}
+
+.telemetry-val {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #F8FAFC;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.telemetry-lbl {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+.badge-turbo {
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.2), rgba(249, 115, 22, 0.2));
+    color: #FDE047;
+    border: 1px solid rgba(234, 179, 8, 0.4);
+}
+
+.badge-gpu {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6EE7B7;
+    border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
