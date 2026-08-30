@@ -18,13 +18,43 @@ def is_valid_youtube_url(url: str) -> bool:
     return bool(re.match(youtube_regex, url.strip()))
 
 
+def get_base_ytdlp_opts() -> Dict[str, Any]:
+    """
+    Returns base yt-dlp configuration with multi-client extraction arguments,
+    browser user-agents, and cookie support to prevent HTTP 403 Forbidden on cloud datacenters.
+    """
+    opts: Dict[str, Any] = {
+        'quiet': True,
+        'no_warnings': True,
+        'ffmpeg_location': get_ffmpeg_exe(),
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web_creator', 'mweb', 'web'],
+                'player_skip': ['webpage', 'configs'],
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Sec-Fetch-Mode': 'navigate',
+        },
+    }
+
+    # If cookies.txt exists or YTDLP_COOKIES is defined, attach it
+    if os.path.exists("cookies.txt"):
+        opts['cookiefile'] = "cookies.txt"
+    elif os.getenv("YTDLP_COOKIES_PATH") and os.path.exists(os.getenv("YTDLP_COOKIES_PATH", "")):
+        opts['cookiefile'] = os.getenv("YTDLP_COOKIES_PATH")
+
+    return opts
+
+
 def get_youtube_info(url: str) -> Dict[str, Any]:
     """Extracts metadata from a YouTube video without downloading."""
     ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
+        **get_base_ytdlp_opts(),
         'skip_download': True,
-        'ffmpeg_location': get_ffmpeg_exe(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -47,7 +77,7 @@ def download_youtube_video(
 ) -> Dict[str, Any]:
     """
     Downloads a YouTube video to the output directory as MP4.
-    Defaults to 720p for fast download throughput while maintaining crisp summary visual quality.
+    Includes multi-tier client fallback (Android, iOS, MWeb) to prevent Cloud 403 Forbidden.
     """
     ensure_dir(output_dir)
     outtmpl = os.path.join(output_dir, "%(id)s.%(ext)s")
@@ -64,34 +94,59 @@ def download_youtube_video(
                 "eta": d.get('eta', 0),
             })
 
-    ffmpeg_exe = get_ffmpeg_exe()
-    
-    # Format selector based on resolution setting
+    target_height = 720
     if resolution == "1080p":
-        fmt = 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best[ext=mp4]/best'
+        target_height = 1080
     elif resolution == "480p":
-        fmt = 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480][ext=mp4]/best'
-    else:  # Default 720p - optimum speed & quality balance
-        fmt = 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[ext=mp4]/best'
+        target_height = 480
 
+    fmt = f'bestvideo[height<={target_height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<={target_height}]+bestaudio/best[height<={target_height}]/best[ext=mp4]/best'
+
+    base_opts = get_base_ytdlp_opts()
     ydl_opts = {
+        **base_opts,
         'format': fmt,
         'outtmpl': outtmpl,
         'merge_output_format': 'mp4',
-        'quiet': True,
-        'no_warnings': True,
-        'nopart': True,                        # Prevents Windows .part file renaming lock collisions
-        'windowsfilenames': True,              # Windows path safety
-        'retries': 5,                          # Auto retry on socket drop
-        'fragment_retries': 5,                 # Auto retry on DASH fragments
+        'nopart': True,                        # Prevents .part file renaming locks
+        'windowsfilenames': True,              # Path safety
+        'retries': 10,                         # Auto retry on socket drop
+        'fragment_retries': 10,                # Auto retry on DASH fragments
         'concurrent_fragment_downloads': 4,    # Multi-threaded fragment downloading
         'overwrites': False,                   # Re-use existing download if available
-        'ffmpeg_location': ffmpeg_exe,
         'progress_hooks': [_progress_hook] if progress_callback else [],
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+    info = None
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+    except Exception as primary_err:
+        print(f"Primary yt-dlp download failed ({primary_err}), attempting iOS/Android fallback...")
+        # Fallback 1: Mobile player clients + simplified format to bypass Cloud 403
+        fallback_opts = dict(ydl_opts)
+        fallback_opts['format'] = 'best[ext=mp4]/best'
+        fallback_opts['extractor_args'] = {
+            'youtube': {
+                'player_client': ['ios', 'android', 'mweb'],
+                'player_skip': ['webpage', 'configs'],
+            }
+        }
+        try:
+            with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+        except Exception as fb_err:
+            # Fallback 2: Stream URL direct extraction
+            fallback_opts_2 = dict(ydl_opts)
+            fallback_opts_2['format'] = 'bestvideo*+bestaudio/best'
+            fallback_opts_2['extractor_args'] = {
+                'youtube': {
+                    'player_client': ['mweb', 'android'],
+                }
+            }
+            with yt_dlp.YoutubeDL(fallback_opts_2) as ydl:
+                info = ydl.extract_info(url, download=True)
+
         video_id = info.get("id")
         # Locate the downloaded file
         expected_path = os.path.join(output_dir, f"{video_id}.mp4")
@@ -246,12 +301,11 @@ def extract_youtube_subtitles(url: str) -> Optional[List[Dict[str, Any]]]:
     Supports all English variants and fallbacks. Returns list of segments or None.
     """
     ydl_opts = {
+        **get_base_ytdlp_opts(),
         'skip_download': True,
         'writesubtitles': True,
         'writeautomaticsub': True,
         'subtitleslangs': ['en.*', 'en', 'a.en', 'en-orig', 'en-US', 'en-GB', 'en-IN', 'en-CA', 'en-AU'],
-        'quiet': True,
-        'no_warnings': True,
     }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -260,6 +314,7 @@ def extract_youtube_subtitles(url: str) -> Optional[List[Dict[str, Any]]]:
     except Exception as e:
         print(f"Warning: Failed to fetch online subtitles: {e}")
     return None
+
 
 
 
